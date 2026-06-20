@@ -1,0 +1,12 @@
+Implementation Notes & Linux Setup
+To ensure this app runs optimally with the minimum possible overhead:
+
+Prerequisites:
+
+For X11 (Ubuntu, Mint, Debian, etc.): Run sudo apt install feh
+
+For Wayland (Fedora, Arch GNOME/Sway): Run sudo pacman -S swww or your package manager's equivalent, and ensure swww-daemon is running in your startup applications.
+
+Memory Efficiency: Saving the composite image directly to /tmp/ uses Linux's tmpfs (RAM disk), meaning it bypasses your SSD/HDD entirely, preventing drive wear and executing image writes in microseconds.
+
+CPU Efficiency: By setting the default interval to 60 seconds, the script sleeps completely between updates, consuming absolutely zero background processing cycles.
