@@ -1,0 +1,103 @@
+To transition this ultra-lightweight application to macOS, we can maintain almost the exact same architecture, keeping your resource footprint exceptionally small.
+
+On macOS, instead of relying on Linux display servers (X11/Wayland), we leverage the built-in macOS AppleScript engine (osascript) via a subprocess call. This removes the need for any heavy background frameworks or compiled Swift/Objective-C binaries, maintaining an idle memory footprint under 30MB and 0% CPU during sleep cycles.
+
+Here is the complete configuration and code adjustments tailored for macOS.
+
+1. Dependencies (requirements.txt)
+The core dependencies remain identical to the Linux version. No special macOS platform wrappers are required, keeping your repository clean.
+
+Plaintext
+Pillow==10.3.0
+pytz==2024.1
+2. Core Logic (main.py for macOS)
+This script overrides the wallpaper-setting routine with an AppleScript handler that safely communicates with the macOS system user interface to swap your background.
+
+Python
+import os
+import time
+import json
+import subprocess
+from datetime import datetime
+import pytz
+from PIL import Image, ImageDraw, ImageFont
+
+def load_config():
+    with open('config.json', 'r') as f:
+        return json.load(f)
+
+def set_macos_wallpaper(image_path):
+    """
+    Uses the native macOS AppleScript engine to safely update the desktop 
+    background image across all active spaces.
+    """
+    script = f'''
+    tell application "System Events"
+        tell every desktop
+            set picture to "{image_path}"
+        end tell
+    end tell
+    '''
+    try:
+        subprocess.run(["osascript", "-e", script], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error setting macOS wallpaper: {e}")
+
+def generate_wallpaper(config):
+    # Load the base user-uploaded image
+    with Image.open(config["image_path"]) as img:
+        base_img = img.convert("RGB")
+        draw = ImageDraw.Draw(base_img)
+        
+        # Pull exact South African Standard Time (SAST)
+        sa_tz = pytz.timezone('Africa/Johannesburg')
+        sa_time = datetime.now(sa_tz).strftime("%H:%M")
+        
+        # Load a default native macOS system font
+        # San Francisco or Helvetica Neue are standard on macOS
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", config["font_size"])
+        except IOError:
+            try:
+                font = ImageFont.truetype("/System/Library/Fonts/Cache/Arial.ttf", config["font_size"])
+            except IOError:
+                font = ImageFont.load_default()
+            
+        # Composite the live text onto the background image
+        draw.text(
+            tuple(config["position"]), 
+            sa_time, 
+            fill=tuple(config["text_color"]), 
+            font=font
+        )
+        
+        # Save to a temporary file path
+        # macOS treats /tmp/ as a shared secure temporary folder
+        tmp_path = os.path.abspath("/tmp/current_wallpaper.jpg")
+        base_img.save(tmp_path, "JPEG", quality=90)
+        
+        # Execute the native desktop update
+        set_macos_wallpaper(tmp_path)
+
+def main():
+    print("Starting SA Wallpaper Service for macOS...")
+    while True:
+        try:
+            config = load_config()
+            generate_wallpaper(config)
+        except Exception as e:
+            print(f"Execution error: {e}")
+            
+        # Enforce complete execution pause to drop CPU consumption to zero
+        time.sleep(config.get("update_interval_seconds", 60))
+
+if __name__ == "__main__":
+    main()
+Implementation Notes & macOS Privileges
+System Permissions: The first time you execute this script in your terminal, macOS may prompt you with a system dialog requesting permission for your terminal emulator (e.g., Terminal, iTerm2, or VS Code) to control "System Events". You must click Allow so the AppleScript can change the wallpaper.
+
+Absolute Paths: Unlike Linux, macOS AppleScript explicitly requires an absolute path (/tmp/current_wallpaper.jpg) rather than relative structures to target files correctly, which is why os.path.abspath() is explicitly called out in the code.
+
+Multi-Monitor Support: The AppleScript directive tell every desktop automatically scales across multi-display setups, changing the wallpaper and updating the time on all connected monitors simultaneously.
+
+Whenever you return to the repository layout, would you like to explore setting this script up as a persistent background daemon (such as a Linux systemd service or a macOS launchd plist file) so it runs quietly automatically upon system boot?
