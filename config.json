@@ -1,0 +1,7 @@
+{
+  "image_path": "path/to/your/uploaded_image.jpg",
+  "font_size": 72,
+  "position": [100, 100],
+  "text_color": [255, 255, 255],
+  "update_interval_seconds": 60
+}
